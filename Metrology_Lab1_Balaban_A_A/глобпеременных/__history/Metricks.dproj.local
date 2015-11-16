@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.446,=C:\Users\Саша\Documents\RAD Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.216,C:\Users\Саша\Documents\RAD Studio\Projects\Unit1.pas=E:\метрология\глобпеременных\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.896,C:\Users\Саша\Documents\RAD Studio\Projects\Project1.dproj=E:\метрология\глобпеременных\__history\Project1.dproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.765,=C:\Users\Саша\Documents\RAD Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.216,C:\Users\Саша\Documents\RAD Studio\Projects\Unit1.dfm=E:\метрология\глобпеременных\Unit1.dfm</Transaction>
+    <Transaction>2015.11.16 08:57:10.892,E:\метрология Балабан А.А\глобпеременных\Metrickofglobalvariables.dfm=E:\метрология Балабан А.А\глобпеременных\Unit1.dfm</Transaction>
+    <Transaction>2015.11.16 08:57:10.892,E:\метрология Балабан А.А\глобпеременных\Metrickofglobalvariables.pas=E:\метрология Балабан А.А\глобпеременных\Unit1.pas</Transaction>
+    <Transaction>2015.11.16 08:57:57.283,E:\метрология Балабан А.А\глобпеременных\__history\Metricks.dproj=E:\метрология Балабан А.А\глобпеременных\__history\Project1.dproj</Transaction>
+  </Transactions>
+</BorlandProject>
