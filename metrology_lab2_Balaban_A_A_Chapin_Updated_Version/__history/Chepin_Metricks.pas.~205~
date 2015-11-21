@@ -1,0 +1,910 @@
+unit Chepin_Metricks;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
+  System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, UnitOfConstantVariables;
+
+type
+  Tmetrick = class(TForm)
+    ToOpenFile: TButton;
+    DialogFoFileOpening: TOpenDialog;
+    ToStart: TButton;
+    WindowsForMetrick: TMemo;
+    ChangeTheCode: TButton;
+    procedure ToOpenFileClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure ToStartClick(Sender: TObject);
+    procedure ChangeTheCodeClick(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+  TypeListOfVariables = ^ListOfVariables;
+
+  ListOfVariables = record
+    TheVariableInTheList: string;
+    Next: TypeListOfVariables;
+  end;
+
+  TypeSetOfChar = set of ansichar;
+
+const
+  Const_TheEndOfMasOfKeyWordsForVariables = 9;
+  Const_TheNumberOfDifferentsTypeOfVariablesUsing = 4;
+
+var
+  metrick: Tmetrick;
+  Way_To_File, C_Code: string;
+  File_Of_C_Code: textfile;
+  TheVariables, TheFirstVariables: TypeListOfVariables;
+  Set_Of_Symbols: set of ansichar = ['=', ' ', ')', '(', '[', ']', '<', '>',
+    ';', ',', '+', '-'];
+  Set_Of_Key_Words_For_Variables_Types
+    : array [1 .. Const_TheEndOfMasOfKeyWordsForVariables] of ansistring = (
+    'int',
+    'char',
+    'bool',
+    'float',
+    'double',
+    'long',
+    'signed',
+    'unsigned',
+    'short'
+  );
+  Set_Of_Key_Words_For_Input_And_Output
+    : array [1 .. Const_TheNumberOfDifferentsTypeOfVariablesUsing]
+    of ansistring = (
+    'printf',
+    'scanf',
+    'scanf_s',
+    'printf_s'
+  );
+
+implementation
+
+{$R *.dfm}
+
+function Find_In_List_Of_Variables(TheVariables, TheFirstVariables
+  : TypeListOfVariables; Variable_That_Need_To_Put: string): boolean;
+begin
+  Result := false;
+  TheVariables := TheFirstVariables;
+  if TheVariables <> nil then
+    while (TheVariables^.Next <> nil) and
+      (TheVariables^.TheVariableInTheList <> Variable_That_Need_To_Put) do
+      TheVariables := TheVariables^.Next;
+  if (TheVariables = nil) or (TheVariables^.TheVariableInTheList <>
+    Variable_That_Need_To_Put) then
+    Result := true;
+end;
+
+procedure Add_To_List_Of_Variables(var TheVariables: TypeListOfVariables;
+  Variable_That_Need_To_Put: string);
+begin
+  new(TheVariables^.Next);
+  TheVariables := TheVariables^.Next;
+  TheVariables.TheVariableInTheList := Variable_That_Need_To_Put;
+  TheVariables^.Next := nil;
+end;
+
+procedure Create_And_Nil_The_Lists_Of_Variables();
+begin
+  new(TheFirstVariables);
+  TheFirstVariables := nil;
+  new(TheVariables);
+  TheVariables := nil;
+end;
+
+Function To_Check_The_Belong_To_English_Alphabet(Some_Symbols_From_Code: string;
+  I: integer): boolean;
+const
+  Const_TheStartOfLowEnglishAlphabetInASCII = 65;
+  Const_TheEndOfLowEnglishAlphabetInASCII = 90;
+  Const_TheStartOfHighEnglishAlphabetInASCII = 97;
+  Const_TheEndOfHighEnglishAlphabetInASCII = 122;
+  Const_TheNumberOfUnderlineInASCII = 95;
+begin
+  Result := false;
+  if (((ord(Some_Symbols_From_Code[I]) >=
+    Const_TheStartOfLowEnglishAlphabetInASCII) and
+    (ord(Some_Symbols_From_Code[I]) <= Const_TheEndOfLowEnglishAlphabetInASCII))
+    or (ord(Some_Symbols_From_Code[I]) = Const_TheNumberOfUnderlineInASCII) or
+    ((ord(Some_Symbols_From_Code[I]) >=
+    Const_TheStartOfHighEnglishAlphabetInASCII) and
+    (ord(Some_Symbols_From_Code[I]) <=
+    Const_TheEndOfHighEnglishAlphabetInASCII))) then
+    Result := true;
+end;
+
+procedure Add_To_List_The_Variables_In_Program(C_Code: string;
+  var Start_Position: integer; Set_Of_Symbols: TypeSetOfChar;
+  Variable_That_Need_To_Put: string);
+Const
+  Const_NumberTwo = 2;
+  Const_TheComma = ',';
+  Const_TheSpace = ' ';
+  Const_TheEqually = '=';
+  Const_TheStar = '*';
+  Const_TheDoubleStar = '*';
+  Const_TheNullString = '';
+  Const_TheWordMain = 'main';
+  Const_TheWordTrue = 'true';
+  Const_TheWordFalse = 'false';
+  Const_TheEndOfMasOfKeyWordsForVariables = 8;
+var
+  J, I: integer;
+  Flag_For_Condition_Checking: boolean;
+begin
+  Flag_For_Condition_Checking := true;
+  J := Start_Position;
+  I := 1;
+  while I <= length(Variable_That_Need_To_Put) do
+  begin
+    if Variable_That_Need_To_Put[I] = Const_TheSpace then
+      if C_Code[J - Const_NumberTwo] <> Const_TheComma then
+      begin
+        delete(Variable_That_Need_To_Put, I,
+          length(Variable_That_Need_To_Put) - I);
+        I := 1;
+      end
+      else
+      begin
+        delete(Variable_That_Need_To_Put, I, length(Const_TheSpace));
+        I := I - length(Const_TheSpace);
+      end;
+    if Variable_That_Need_To_Put[I] = Const_TheEqually then
+      delete(Variable_That_Need_To_Put, I, length(Variable_That_Need_To_Put) - I
+        + length(Const_TheEqually));
+    inc(I);
+  end;
+  I := 1;
+  while I <= length(Variable_That_Need_To_Put) do
+  begin
+    if To_Check_The_Belong_To_English_Alphabet(Variable_That_Need_To_Put, I)
+    then
+    else
+      delete(Variable_That_Need_To_Put, I, 1);
+    inc(I);
+  end;
+  for I := 1 to Const_TheEndOfMasOfKeyWordsForVariables do
+    if (Set_Of_Key_Words_For_Variables_Types[I] = Variable_That_Need_To_Put) or
+      ((Const_TheStar + Set_Of_Key_Words_For_Variables_Types[I])
+      = Variable_That_Need_To_Put) or
+      ((Const_TheDoubleStar + Set_Of_Key_Words_For_Variables_Types[I])
+      = Variable_That_Need_To_Put) or
+      ((Set_Of_Key_Words_For_Variables_Types[I] + Const_TheStar)
+      = Variable_That_Need_To_Put) or
+      ((Set_Of_Key_Words_For_Variables_Types[I] + Const_TheDoubleStar)
+      = Variable_That_Need_To_Put) then
+      Flag_For_Condition_Checking := false;
+  if Variable_That_Need_To_Put = Const_TheStar then
+    Variable_That_Need_To_Put := Const_TheSpace
+  else if Variable_That_Need_To_Put <> Const_TheNullString then
+
+    while (Variable_That_Need_To_Put[length(Const_TheStar)] = Const_TheStar) and
+      (Variable_That_Need_To_Put <> Const_TheNullString) do
+      delete(Variable_That_Need_To_Put, 1, length(Const_TheStar));
+  if (Variable_That_Need_To_Put = Const_TheWordMain) or
+    (Variable_That_Need_To_Put = Const_TheWordFalse) or
+    (Variable_That_Need_To_Put = Const_TheWordTrue) then
+    Variable_That_Need_To_Put := Const_TheNullString;
+  if (Variable_That_Need_To_Put <> Const_TheNullString) and
+    (Flag_For_Condition_Checking) then
+
+    if (TheVariables = nil) and (TheFirstVariables = nil) then
+    begin
+      new(TheVariables);
+      TheVariables^.Next := nil;
+      TheVariables^.TheVariableInTheList := Variable_That_Need_To_Put;
+      TheFirstVariables := TheVariables;
+    end
+    else if Find_In_List_Of_Variables(TheVariables, TheFirstVariables,
+      Variable_That_Need_To_Put) then
+      if (TheVariables <> nil) and (TheFirstVariables <> nil) then
+        Add_To_List_Of_Variables(TheVariables, Variable_That_Need_To_Put);
+
+end;
+
+procedure To_Find_The_Sum_Of_Variables(var Num_Of_Variables: integer;
+  Line_For_Modifiable_Variables: string);
+
+var
+  I: integer;
+begin
+  I := 1;
+  while I <= length(Line_For_Modifiable_Variables) do
+  begin
+    if Line_For_Modifiable_Variables[I] = ' ' then
+      inc(Num_Of_Variables);
+    inc(I);
+  end;
+end;
+
+procedure Delete_Same_Variables_Names(var Line_For_Variables: string);
+Const
+  Const_TheSpace = ' ';
+var
+  Start_Position, J, I: integer;
+  Some_Symbols_From_Code: string;
+begin
+  Start_Position := 1;
+  while Start_Position <= length(Line_For_Variables) do
+  begin
+    J := Start_Position;
+    if Line_For_Variables[Start_Position] = Const_TheSpace then
+      inc(Start_Position);
+    while (Line_For_Variables[Start_Position] <> Const_TheSpace) and
+      (Start_Position <= length(Line_For_Variables)) do
+      inc(Start_Position);
+    if Line_For_Variables[Start_Position] = Const_TheSpace then
+      dec(Start_Position);
+    if Line_For_Variables[J] = Const_TheSpace then
+      inc(J);
+    Some_Symbols_From_Code := copy(Line_For_Variables, J,
+      Start_Position - J + length(Const_TheSpace));
+    inc(Start_Position);
+    J := Start_Position;
+    I := J;
+    while I <= length(Line_For_Variables) do
+    begin
+      if (copy(Line_For_Variables, I, length(Some_Symbols_From_Code))
+        = Some_Symbols_From_Code) and
+        (Line_For_Variables[I - length(Const_TheSpace)] = Const_TheSpace) and
+        ((Line_For_Variables[I + length(Some_Symbols_From_Code)
+        ] = Const_TheSpace) or (J = length(Line_For_Variables))) then
+      begin
+        delete(Line_For_Variables, I - length(Const_TheSpace),
+          length(Some_Symbols_From_Code) + length(Const_TheSpace));
+        dec(I);
+      end;
+      inc(I);
+    end;
+    inc(Start_Position);
+  end;
+end;
+
+function Check_The_Line_On_Same_Variables(Line_For_Variables: string;
+  Some_Symbols_From_Code: string): boolean;
+const
+
+  Const_TheSpace = ' ';
+var
+  I, Start_Position: integer;
+begin
+  Result := false;
+  I := 1;
+  while I <= length(Line_For_Variables) do
+  begin
+    if Line_For_Variables[I] = Const_TheSpace then
+      inc(I);
+    Start_Position := I;
+    while (I <= length(Line_For_Variables)) and
+      (Line_For_Variables[I] <> Const_TheSpace) do
+      inc(I);
+    if copy(Line_For_Variables, Start_Position, I - Start_Position) = Some_Symbols_From_Code
+    then
+      Result := true;
+    inc(I);
+  end;
+end;
+
+procedure Check_On_Parasitic_Variables_Existence
+  (Line_For_Variables_That_For_Input_And_Output, Line_For_Modifiable_Variables,
+  Line_For_Control_Variables: string; var Line_For_Parasitic_Variables: string);
+const
+
+  Const_TheSpace = ' ';
+var
+  Start_Position, I: integer;
+  Some_Symbols_From_Code: string;
+begin
+
+  I := 1;
+  while I <= length(Line_For_Parasitic_Variables) do
+  begin
+    Start_Position := I;
+    while (Line_For_Parasitic_Variables[I] <> Const_TheSpace) and
+      (I <= length(Line_For_Parasitic_Variables)) do
+      inc(I);
+    Some_Symbols_From_Code := copy(Line_For_Parasitic_Variables, Start_Position,
+      I - Start_Position);
+    if Check_The_Line_On_Same_Variables
+      (Line_For_Variables_That_For_Input_And_Output, Some_Symbols_From_Code) or
+      Check_The_Line_On_Same_Variables(Line_For_Modifiable_Variables,
+      Some_Symbols_From_Code) or Check_The_Line_On_Same_Variables
+      (Line_For_Control_Variables, Some_Symbols_From_Code) then
+    begin
+
+      delete(Line_For_Parasitic_Variables, Start_Position,
+        I - Start_Position + 1);
+      I := Start_Position;
+      dec(I);
+    end;
+    if I <= length(Line_For_Parasitic_Variables) then
+      inc(I);
+  end;
+
+end;
+
+procedure Tmetrick.ToOpenFileClick(Sender: TObject);
+const
+  Const_TheNewLine = #13#10;
+var
+  Line_From_Code: string;
+begin
+  Line_From_Code := Const_TheNullString;
+  C_Code := Const_TheNullString;
+  DialogFoFileOpening.FileName := Const_TheNullString;
+  Way_To_File := Const_TheNullString;
+
+  if DialogFoFileOpening.execute then
+    Way_To_File := DialogFoFileOpening.FileName;
+
+  if Way_To_File <> Const_TheNullString then
+  begin
+    ToStart.Enabled := true;
+    WindowsForMetrick.text := Const_TheNullString;
+    assignfile(File_Of_C_Code, Way_To_File);
+    reset(File_Of_C_Code);
+
+    while not(eof(File_Of_C_Code)) do
+    begin
+      readln(File_Of_C_Code, Line_From_Code);
+      WindowsForMetrick.text := WindowsForMetrick.text + Line_From_Code +
+        Const_TheEndOfLine + Const_TheNewLine;
+      C_Code := C_Code + Line_From_Code + Const_TheEndOfLine;
+    end;
+
+    closefile(File_Of_C_Code);
+    WindowsForMetrick.ReadOnly := false;
+  end
+  else
+    showmessage('Choose the file for metricks calculation');
+
+end;
+
+procedure To_Find_The_Managment_Variables(var Start_Position: integer;
+  var Line_For_Control_Variables: string; Key_Word: string);
+const
+  Const_TheSpace = ' ';
+  Const_TheOpenBracket = '(';
+  Const_TheCloseBracket = ')';
+var
+  J: integer;
+begin
+  if (copy(C_Code, Start_Position, length(Key_Word)) = Key_Word) then
+  begin
+    Start_Position := Start_Position + length(Key_Word);
+    inc(Start_Position);
+    while C_Code[Start_Position] = Const_TheSpace do
+      inc(Start_Position);
+    if C_Code[Start_Position] = Const_TheOpenBracket then
+    begin
+      inc(Start_Position);
+      while C_Code[Start_Position] <> Const_TheCloseBracket do
+      begin
+        if not(C_Code[Start_Position] in Set_Of_Symbols) then
+        begin
+          J := Start_Position;
+          while not(C_Code[Start_Position] in Set_Of_Symbols) do
+            inc(Start_Position);
+          if not(Find_In_List_Of_Variables(TheVariables, TheFirstVariables,
+            copy(C_Code, J, Start_Position - J))) then
+            Line_For_Control_Variables := Line_For_Control_Variables +
+              copy(C_Code, J, Start_Position - J) + ' ';
+          dec(Start_Position);
+        end;
+        inc(Start_Position);
+      end;
+    end;
+  end;
+end;
+
+procedure To_Find_Parasitic_Variables(var Line_For_Parasitic_Variables: string;
+  TheVariables, TheFirstVariables: TypeListOfVariables);
+const
+  Const_NumberZero = 0;
+  Const_TheEndOfLine = '#13#10';
+  Const_TheSpace = ' ';
+var
+  Start_Position, J, Num_Of_Variables: integer;
+  Some_Symbols_From_Code: string;
+begin
+
+  Start_Position := 1;
+  TheVariables := TheFirstVariables;
+  while TheVariables <> nil do
+  begin
+    Num_Of_Variables := Const_NumberZero;
+    J := Start_Position;
+    while J <= (length(C_Code) - length(Const_TheEndOfLine)) do
+    begin
+      Some_Symbols_From_Code :=
+        copy(C_Code, J, length(TheVariables^.TheVariableInTheList));
+      if (Some_Symbols_From_Code = TheVariables^.TheVariableInTheList) and
+        ((C_Code[J - 1] in Set_Of_Symbols) or
+        (copy(C_Code, J - length(Const_TheEndOfLine) - 1,
+        length(Const_TheEndOfLine)) = Const_TheEndOfLine)) and
+        (C_Code[J + length(TheVariables^.TheVariableInTheList)]
+        in Set_Of_Symbols) then
+        inc(Num_Of_Variables);
+      inc(J);
+    end;
+
+    if Num_Of_Variables = 1 then
+      Line_For_Parasitic_Variables := Line_For_Parasitic_Variables +
+        TheVariables^.TheVariableInTheList + Const_TheSpace;
+    TheVariables := TheVariables^.Next;
+  end;
+end;
+
+Function To_Check_On_Equally(Start_Position: integer; C_Code: string): boolean;
+const
+  Const_Equally = '=';
+  Const_DoubleEqually = '==';
+  Const_NotEqually = '!=';
+  Const_ToIncrease = '++';
+  Const_ToDecrease = '--';
+begin
+  if ((C_Code[Start_Position] = Const_Equally) and
+    ((copy(C_Code, Start_Position, length(Const_DoubleEqually)) <>
+    Const_DoubleEqually) and (copy(C_Code, Start_Position - 1,
+    length(Const_DoubleEqually)) <> Const_DoubleEqually) and
+    (copy(C_Code, Start_Position - 1, length(Const_NotEqually)) <>
+    Const_NotEqually)) and (copy(C_Code, Start_Position,
+    length(Const_NotEqually)) <> Const_NotEqually)) or
+    (copy(C_Code, Start_Position, length(Const_ToIncrease)) = Const_ToIncrease)
+    or (copy(C_Code, Start_Position, length(Const_ToDecrease))
+    = Const_ToDecrease) then
+    Result := true
+  else
+    Result := false;
+end;
+
+Function To_Check_On_Modifable_Variable_End(C_Code: string;
+  Start_Position: integer): boolean;
+const
+  Const_TheSpace = ' ';
+  Const_TheSharp = '#';
+  Const_TheEndOfLine = '#13#10';
+  Const_TheOpenBracket = '(';
+begin
+  if ((C_Code[Start_Position] <> Const_TheSpace) and
+    (C_Code[Start_Position] <> Const_TheOpenBracket) and
+    (copy(C_Code, Start_Position - length(Const_TheSpace),
+    length(Const_TheSharp)) <> Const_TheSharp) and
+    (copy(C_Code, Start_Position - length(Const_TheEndOfLine) -
+    length(Const_TheSpace), length(Const_TheEndOfLine)) <> Const_TheEndOfLine))
+  then
+    Result := true
+  else
+    Result := false;
+end;
+
+procedure To_Find_Modifable_Variables(var Line_For_Modifiable_Variables
+  : string);
+Const
+  Const_TheSpace = ' ';
+  Const_TheSharp = '#';
+  Const_Equally = '=';
+  Const_TheOpenSquareBracket = '[';
+  Const_TheCloseBracket = ')';
+  Const_TheOpenBracket = '(';
+  Const_TheEndOfLine = '#13#10';
+  Const_TheEndOfOperator = ';';
+var
+  Start_Position, J, I: integer;
+  Some_Symbols_From_Code: string;
+begin
+  Start_Position := 1;
+  while Start_Position <= (length(C_Code) - length(Const_TheEndOfLine)) do
+  begin
+    if To_Check_On_Equally(Start_Position, C_Code) then
+    begin
+      dec(Start_Position);
+      while C_Code[Start_Position] = Const_TheSpace do
+        dec(Start_Position);
+      J := Start_Position;
+      while To_Check_On_Modifable_Variable_End(C_Code, Start_Position) do
+        dec(Start_Position);
+      inc(Start_Position);
+      if Start_Position > J then
+        dec(Start_Position);
+
+      Some_Symbols_From_Code := copy(C_Code, Start_Position,
+        J - Start_Position + 1);
+      I := 1;
+      while not To_Check_The_Belong_To_English_Alphabet
+        (Some_Symbols_From_Code, I) do
+      begin
+        delete(Some_Symbols_From_Code, I, 1);
+      end;
+
+      for I := 1 to length(Some_Symbols_From_Code) do
+        if Some_Symbols_From_Code[I] = Const_TheOpenSquareBracket then
+          delete(Some_Symbols_From_Code, I, length(Some_Symbols_From_Code) - I +
+            length(Const_TheOpenSquareBracket));
+      if not(Find_In_List_Of_Variables(TheVariables, TheFirstVariables,
+        Some_Symbols_From_Code)) then
+        Line_For_Modifiable_Variables := Line_For_Modifiable_Variables +
+          Some_Symbols_From_Code + Const_TheSpace;
+      Start_Position := J;
+      while (C_Code[Start_Position] <> Const_Equally) and
+        (C_Code[Start_Position] <> Const_TheEndOfOperator) and
+        (copy(C_Code, Start_Position, length(Const_TheEndOfLine)) <>
+        Const_TheEndOfLine) and
+        (C_Code[Start_Position] <> Const_TheCloseBracket) do
+        inc(Start_Position);
+    end
+    else;
+    inc(Start_Position);
+  end;
+
+end;
+
+Function To_Check_On_The_End_Of_Variable(C_Code: string;
+  Start_Position: integer): boolean;
+const
+  Const_TheAmpersand = '&';
+  Const_TheComma = ',';
+  Const_TheSpace = ' ';
+begin
+  if (C_Code[Start_Position] = Const_TheSpace) or
+    (C_Code[Start_Position] = Const_TheComma) or
+    (C_Code[Start_Position] = Const_TheAmpersand) then
+    Result := true
+  else
+    Result := false;
+end;
+
+procedure To_Find_Variables_That_For_Input_And_Output
+  (var Line_For_Variables_That_For_Input_And_Output: string; C_Code: string);
+Const
+  Const_TheNumberOfDifferentsTypeOfVariablesUsing = 4;
+  Const_TheOpenBracket = '(';
+  Const_TheEndOfLine = '#13#10';
+  Const_TheAmpersand = '&';
+  Const_TheComma = ',';
+  Const_TheSpace = ' ';
+  Const_TheOpenSquareBracket = '[';
+  Const_TheCloseBracket = ')';
+  Const_TheEndOfOperator = ';';
+var
+  Some_Symbols_From_Code: string;
+  Start_Position, I, J: integer;
+  Flag_For_Condition_Checking: boolean;
+begin
+  Start_Position := 1;
+  while Start_Position <= (length(C_Code) - length(Const_TheEndOfLine)) do
+  begin
+    Flag_For_Condition_Checking := false;
+    I := 1;
+    while (I <= Const_TheNumberOfDifferentsTypeOfVariablesUsing) and
+      (copy(C_Code, Start_Position, length(Set_Of_Key_Words_For_Input_And_Output
+      [I])) <> Set_Of_Key_Words_For_Input_And_Output[I]) do
+      inc(I);
+    if copy(C_Code, Start_Position,
+      length(Set_Of_Key_Words_For_Input_And_Output[I]))
+      = Set_Of_Key_Words_For_Input_And_Output[I] then
+      Flag_For_Condition_Checking := true;
+    if Flag_For_Condition_Checking then
+    begin
+      Start_Position := Start_Position +
+        length(Set_Of_Key_Words_For_Input_And_Output[I]);
+      while To_Check_On_The_End_Of_Variable(C_Code, Start_Position) do
+        inc(Start_Position);
+      if C_Code[Start_Position] = Const_TheOpenBracket then
+      begin
+        inc(Start_Position);
+        while To_Check_On_The_End_Of_Variable(C_Code, Start_Position) do
+          inc(Start_Position);
+        J := Start_Position;
+        while C_Code[J] <> Const_TheCloseBracket do
+        begin
+          while To_Check_On_The_End_Of_Variable(C_Code, Start_Position) do
+            inc(Start_Position);
+          J := Start_Position;
+
+          while (C_Code[J] <> Const_TheSpace) and (C_Code[J] <> Const_TheComma)
+            and (C_Code[J] <> Const_TheCloseBracket) and
+            (C_Code[J] <> Const_TheOpenSquareBracket) do
+            inc(J);
+          Some_Symbols_From_Code := copy(C_Code, Start_Position,
+            J - Start_Position);
+          if (not(Find_In_List_Of_Variables(TheVariables, TheFirstVariables,
+            Some_Symbols_From_Code))) then
+          begin
+            Line_For_Variables_That_For_Input_And_Output :=
+              Line_For_Variables_That_For_Input_And_Output +
+              Some_Symbols_From_Code + Const_TheSpace;
+          end;
+          Start_Position := J;
+          inc(Start_Position);
+        end;
+      end;
+
+    end;
+    inc(Start_Position);
+  end;
+
+end;
+
+Procedure To_Find_Variables_In_Program(var TheVariables, TheFirstVariables
+  : TypeListOfVariables; C_Code: string);
+
+const
+  Const_TheEndOfMasOfKeyWordsForVariables = 9;
+  Const_TheComma = ',';
+  Const_TheOpenBracket = '(';
+  Const_TheSpace = ' ';
+  Const_TheCloseBracket = '(';
+  Const_TheEndOfProgramBody = '}';
+  Const_TheEndOfOperator = ';';
+  Const_TheEndOfLine = '#13#10';
+  Const_TheMaxLengthOfVariablesOfType = 8;
+  Const_TheMinLengthOfVariablesOfType = 3;
+var
+
+  Start_Position, I, J: integer;
+  Flag_For_Condition_Checking: boolean;
+  Some_Symbols_From_Code: string;
+begin
+  Start_Position := 1;
+
+  while (Start_Position <= (length(C_Code) - length(Const_TheEndOfLine))) do
+  begin
+    I := Const_TheMinLengthOfVariablesOfType;
+    Flag_For_Condition_Checking := false;
+    while (I <= Const_TheMaxLengthOfVariablesOfType) and
+      (not Flag_For_Condition_Checking) do
+    begin
+      Flag_For_Condition_Checking := false;
+      for J := 1 to Const_TheEndOfMasOfKeyWordsForVariables do
+        if copy(C_Code, Start_Position, I)
+          = Set_Of_Key_Words_For_Variables_Types[J] then
+          Flag_For_Condition_Checking := true;
+      inc(I);
+    end;
+    if (Flag_For_Condition_Checking) and
+      (C_Code[Start_Position + I] <> Const_TheComma) then
+    begin
+      Start_Position := Start_Position + I;
+      while (C_Code[Start_Position] <> Const_TheEndOfOperator) and
+        (C_Code[Start_Position] <> Const_TheCloseBracket) and
+        (C_Code[Start_Position] <> Const_TheEndOfProgramBody) and
+        (C_Code[Start_Position] <> Const_TheOpenBracket) do
+
+      begin
+        Some_Symbols_From_Code := copy(C_Code, Start_Position - 1, 1);
+        if (Some_Symbols_From_Code = Const_TheSpace) or
+          (Some_Symbols_From_Code = Const_TheOpenBracket) or
+          (Some_Symbols_From_Code = Const_TheComma) then
+        begin
+          while (copy(C_Code, Start_Position - 1, length(Const_TheSpace)) <>
+            Const_TheSpace) and
+            (copy(C_Code, Start_Position - length(Const_TheComma),
+            length(Const_TheComma)) <> Const_TheComma) do
+            inc(Start_Position);
+          inc(Start_Position);
+          J := Start_Position;
+          while not(C_Code[J] in Set_Of_Symbols) do
+            inc(J);
+          Add_To_List_The_Variables_In_Program(C_Code, Start_Position,
+            Set_Of_Symbols, copy(C_Code, Start_Position - 1,
+            J - Start_Position + 1));
+          Start_Position := J - 1;
+        end;
+        inc(Start_Position);
+      end;
+    end;
+    inc(Start_Position);
+  end;
+end;
+
+procedure Tmetrick.ChangeTheCodeClick(Sender: TObject);
+begin
+  C_Code := WindowsForMetrick.text;
+end;
+
+procedure Tmetrick.FormCreate(Sender: TObject);
+begin
+  Way_To_File := Const_TheNullString;
+  WindowsForMetrick.text := Const_TheNullString;
+end;
+
+procedure Tmetrick.ToStartClick(Sender: TObject);
+const
+  a1 = 1;
+  a2 = 2;
+  a3 = 3;
+  a4 = 0.5;
+  Const_TheWordFor = 'for';
+  Const_TheWordWhile = 'while';
+  Const_TheWordDo = 'do';
+  Const_TheWordIf = 'if';
+  Const_TheNewLine = #13#10;
+var
+  Some_Symbols_From_Code, Line_For_Variables_That_For_Input_And_Output,
+    Line_For_Modifiable_Variables, Line_For_Control_Variables,
+    Line_For_Parasitic_Variables: string;
+  Start_Position, J, P, M, C, T: integer;
+  Q: extended;
+begin
+  Create_And_Nil_The_Lists_Of_Variables();
+
+  WindowsForMetrick.text := Const_TheNullString;
+  Start_Position := 1;
+
+  Start_Position := 1;
+
+  while Start_Position <= (length(C_Code) - length(Const_TheEndOfLine) - 1) do
+  begin
+    Some_Symbols_From_Code := copy(C_Code, Start_Position,
+      length(Const_TheStartOfComments));
+
+    while ((Some_Symbols_From_Code <> Const_TheStartOfComments) and
+      ((length(C_Code) - 1) >= Start_Position)) do
+    begin
+      inc(Start_Position);
+      Some_Symbols_From_Code := copy(C_Code, Start_Position,
+        length(Const_TheStartOfComments));
+    end;
+
+    J := Start_Position + length(Const_TheStartOfComments);
+
+    if ((Some_Symbols_From_Code = Const_TheStartOfComments) and
+      ((length(C_Code) - 1) >= Start_Position)) then
+    begin
+
+      while ((copy(C_Code, J, length(Const_TheEndOfComments)) <>
+        Const_TheEndOfComments) and ((length(C_Code) - 1) >= J)) do
+      begin
+        inc(J);
+      end;
+
+      delete(C_Code, Start_Position, J - Start_Position +
+        length(Const_TheEndOfComments));
+    end;
+  end;
+
+  Start_Position := 1;
+
+  while Start_Position <= (length(C_Code) - length(Const_TheEndOfLine) - 1) do
+  begin
+    Some_Symbols_From_Code := copy(C_Code, Start_Position,
+      length(Const_TheLineOfComments));
+
+    if Some_Symbols_From_Code = Const_TheLineOfComments then
+    begin
+      J := Start_Position;
+      Some_Symbols_From_Code := copy(C_Code, J, length(Const_TheEndOfLine));
+
+      while Some_Symbols_From_Code <> Const_TheEndOfLine do
+      begin
+        inc(J);
+        Some_Symbols_From_Code := copy(C_Code, J, length(Const_TheEndOfLine));
+      end;
+
+      delete(C_Code, Start_Position, J - Start_Position);
+      J := Start_Position;
+      dec(J);
+
+      while ((copy(C_Code, J, length(Const_TheSpace)) = Const_TheSpace) or
+        (copy(C_Code, J - (length(Const_TheEndOfLine) - 1),
+        length(Const_TheEndOfLine)) <> Const_TheEndOfLine)) and
+        (C_Code[J] <> Const_TheEndOfOperator) do
+        dec(J);
+
+      if (copy(C_Code, J - (length(Const_TheEndOfLine) - 1),
+        length(Const_TheEndOfLine)) = Const_TheEndOfLine) then
+        delete(C_Code, J, Start_Position - J +
+          (length(Const_TheEndOfLine) - 1));
+
+    end;
+
+    if copy(C_Code, Start_Position, length(Const_TheLineOfComments)) <> Const_TheLineOfComments
+    then
+      inc(Start_Position);
+
+  end;
+
+  Start_Position := 1;
+
+  while Start_Position <= (length(C_Code) - (length(Const_TheEndOfLine) + 1)) do
+  begin
+    Some_Symbols_From_Code := copy(C_Code, Start_Position, 1);
+
+    if Some_Symbols_From_Code = Const_TheDoubleQuote then
+    begin
+      inc(Start_Position);
+      J := Start_Position;
+      Some_Symbols_From_Code := copy(C_Code, J, 1);
+
+      while (Some_Symbols_From_Code <> Const_TheDoubleQuote) and
+        (J <= length(C_Code)) do
+      begin
+        inc(J);
+        Some_Symbols_From_Code := copy(C_Code, J, 1);
+      end;
+
+      delete(C_Code, Start_Position - 1, J - Start_Position +
+        length(Const_TheDoubleQuote));
+
+    end;
+
+    inc(Start_Position);
+  end;
+
+  To_Find_Variables_In_Program(TheVariables, TheFirstVariables, C_Code);
+
+  To_Find_Variables_That_For_Input_And_Output
+    (Line_For_Variables_That_For_Input_And_Output, C_Code);
+
+  To_Find_Modifable_Variables(Line_For_Modifiable_Variables);
+
+  Start_Position := 1;
+  while Start_Position <= (length(C_Code) - length(Const_TheEndOfLine)) do
+  begin
+    To_Find_The_Managment_Variables(Start_Position, Line_For_Control_Variables,
+      Const_TheWordFor);
+    To_Find_The_Managment_Variables(Start_Position, Line_For_Control_Variables,
+      Const_TheWordDo);
+    To_Find_The_Managment_Variables(Start_Position, Line_For_Control_Variables,
+      Const_TheWordWhile);
+    To_Find_The_Managment_Variables(Start_Position, Line_For_Control_Variables,
+      Const_TheWordIf);
+    inc(Start_Position);
+  end;
+
+  To_Find_Parasitic_Variables(Line_For_Parasitic_Variables, TheVariables,
+    TheFirstVariables);
+
+  Start_Position := 1;
+  Delete_Same_Variables_Names(Line_For_Variables_That_For_Input_And_Output);
+  Delete_Same_Variables_Names(Line_For_Modifiable_Variables);
+  Delete_Same_Variables_Names(Line_For_Control_Variables);
+  Delete_Same_Variables_Names(Line_For_Parasitic_Variables);
+
+  Check_On_Parasitic_Variables_Existence
+    (Line_For_Variables_That_For_Input_And_Output,
+    Line_For_Modifiable_Variables, Line_For_Control_Variables,
+    Line_For_Parasitic_Variables);
+
+  To_Find_The_Sum_Of_Variables(P, Line_For_Variables_That_For_Input_And_Output);
+  To_Find_The_Sum_Of_Variables(M, Line_For_Modifiable_Variables);
+  To_Find_The_Sum_Of_Variables(C, Line_For_Control_Variables);
+  To_Find_The_Sum_Of_Variables(T, Line_For_Parasitic_Variables);
+
+  Q := a1 * P + a2 * M + a3 * C + a4 * T;
+
+  TheVariables := TheFirstVariables;
+  WindowsForMetrick.text := WindowsForMetrick.text +
+    'The variables that were used in programm' + Const_TheNewLine;
+  while TheVariables <> nil do
+  begin
+    WindowsForMetrick.text := WindowsForMetrick.text +
+      TheVariables^.TheVariableInTheList + Const_TheSpace;
+    TheVariables := TheVariables^.Next;
+  end;
+
+  WindowsForMetrick.text := WindowsForMetrick.text + Const_TheNewLine +
+    Const_TheNewLine + 'The variables for input and output' + Const_TheNewLine +
+    Line_For_Variables_That_For_Input_And_Output + Const_TheNewLine +
+    Const_TheNewLine + 'The modifiable variables' + Const_TheNewLine +
+    Line_For_Modifiable_Variables + Const_TheNewLine + Const_TheNewLine +
+    'The managers variables' + Const_TheNewLine + Line_For_Control_Variables +
+    Const_TheNewLine + Const_TheNewLine + 'The parasitic variables' +
+    Const_TheNewLine + Line_For_Parasitic_Variables + Const_TheNewLine +
+    Const_TheNewLine + 'The Result of Chapin metricks :' + Const_TheNewLine +
+    floattostr(Q);
+
+  ToStart.Enabled := false;
+
+end;
+
+end.
